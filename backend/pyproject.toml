@@ -1,0 +1,47 @@
+[build-system]
+requires = ["setuptools>=70"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "urbanvision-backend"
+version = "1.0.0"
+description = "UrbanVision – Budapest Smart City Map: FastAPI backend and data ingestion"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi==0.141.1",
+    "uvicorn[standard]==0.54.0",
+    "pydantic==2.13.5",
+    "pydantic-settings==2.15.0",
+    "psycopg[binary,pool]==3.3.6",
+    "psycopg-pool==3.3.3",
+    "pandas==3.0.6",
+    "httpx==0.28.1",
+    "tzdata==2026.4",                 # IANA time zones (needed on Windows)
+    "gtfs-realtime-bindings==3.0.0",  # Phase 10: GTFS-Realtime protobuf parsing
+    "protobuf==7.36.2",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.1.1",
+    "respx==0.23.1",   # mocks httpx requests (Open-Meteo, Overpass, BKK) in tests
+    "ruff==0.16.9",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*", "ingestion*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+filterwarnings = [
+    "ignore::DeprecationWarning:google.protobuf.*",
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP", "SIM"]

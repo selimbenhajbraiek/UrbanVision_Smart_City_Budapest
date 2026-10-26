@@ -1,0 +1,30 @@
+# Local PostgreSQL + PostGIS for UrbanVision.
+# Usage:  docker compose up -d db
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    container_name: urbanvision-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-urbanvision}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env (see .env.example)}
+      POSTGRES_DB: ${POSTGRES_DB:-urbanvision}
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    # Slightly larger memory settings make the 5.7M-row GTFS import much faster.
+    command: >
+      postgres
+      -c shared_buffers=256MB
+      -c maintenance_work_mem=256MB
+      -c work_mem=32MB
+      -c max_wal_size=2GB
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

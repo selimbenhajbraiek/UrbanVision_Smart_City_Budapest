@@ -1,0 +1,28 @@
+# Secrets / local config
+.env
+*.local
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Downloaded datasets (reproducible via the import commands)
+backend/data/
+
+# Node / frontend
+node_modules/
+frontend/dist/
+frontend/coverage/
+
+# Editors / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db

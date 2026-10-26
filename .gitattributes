@@ -1,0 +1,5 @@
+# Normalise line endings so the project behaves the same on Windows, macOS and Linux.
+* text=auto
+*.sh text eol=lf
+*.sql text eol=lf
+*.txt text eol=lf
