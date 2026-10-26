@@ -1,0 +1,9 @@
+route_id,trip_id,service_id,trip_headsign,direction_id,block_id,shape_id,wheelchair_accessible,bikes_allowed
+M2,M2_T1,WD,Örs vezér tere,0,,SH_M2_0,1,
+M2,M2_T2,WD,Örs vezér tere,0,,SH_M2_0,1,
+M2,M2_T3,WD,Déli pályaudvar,1,,SH_M2_1,1,
+M2,M2_NIGHT,WD,Örs vezér tere,0,,SH_M2_0,1,
+B9,B9_T1,WD,Kálvin tér,0,,,2,
+B9,B9_SUN,SU,Kálvin tér,0,,,,
+H5,H5_T1,WD,Szentendre,0,,MISSING_SHAPE,,
+NOPE,ORPHAN_TRIP,WD,Nowhere,0,,,,

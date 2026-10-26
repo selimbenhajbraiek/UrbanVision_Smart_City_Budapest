@@ -1,0 +1,11 @@
+stop_id,stop_name,stop_lat,stop_lon,stop_code,location_type,location_sub_type,parent_station,wheelchair_boarding
+CS001,Deák Ferenc tér,47.498000,19.054500,,1,,,1
+001001,Deák Ferenc tér,47.498100,19.054600,,0,,CS001,1
+001002,Astoria,47.493500,19.060500,,0,,,1
+001003,Blaha Lujza tér,47.496500,19.070300,,0,,,1
+002001,Deák Ferenc tér M,47.497500,19.055000,002001,0,,,
+002002,Kálvin tér,47.489500,19.062000,,0,,,
+002003,Nowhere,,,,0,,,
+ENT01,Deák Ferenc tér entrance,47.497900,19.054700,,2,,CS001,
+003001,Unused stop,47.510000,19.050000,,0,,,
+004001,Batthyány tér,47.506900,19.038500,,0,,UNKNOWN_PARENT,

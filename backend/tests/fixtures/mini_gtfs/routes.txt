@@ -1,0 +1,6 @@
+agency_id,route_id,route_short_name,route_long_name,route_type,route_desc,route_color,route_text_color,route_sort_order
+BKK,M2,M2,,1,Déli pályaudvar / Örs vezér tere,E41F18,FFFFFF,1
+BKK,B9,9,,3,Óbuda / Kőbánya,009ee3,FFFFFF,20
+BKK,TR70,70,,11,Kossuth tér / Erzsébet királyné útja,FF1609,FFFFFF,30
+HEV,H5,H5,,109,Batthyány tér / Szentendre,8A236C,FFFFFF,5
+BKK,BROKEN,X,,notanumber,Broken route,,,99
