@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     bkk_realtime_base_url: str = "https://go.bkk.hu/api/query/v1/ws/gtfs-rt/full"
     realtime_cache_ttl_seconds: int = 15
 
+    # Authentication (login + admin dashboard)
+    jwt_secret_key: SecretStr | None = None
+    jwt_expire_minutes: int = 60
+
     # Identifies us to public APIs (required by the Overpass / OSM usage policies).
     user_agent: str = "UrbanVision/1.0 (university smart-city project)"
 

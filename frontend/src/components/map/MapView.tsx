@@ -9,10 +9,11 @@ import {
   useMapEvents,
   ZoomControl,
 } from "react-leaflet";
-import type { RouteDetail, StopDetail, UrbanLayerInfo } from "../../api/types";
+import type { Journey, RouteDetail, StopDetail, UrbanLayerInfo } from "../../api/types";
 import type { LayerState } from "../../config/layers";
 import { BASE_MAPS, BUDAPEST_CENTER, DEFAULT_ZOOM, MAX_BOUNDS, MIN_ZOOM } from "../../config/map";
-import type { FlyTarget, Viewport } from "../../state";
+import type { FlyTarget, PlannerPlace, Viewport } from "../../state";
+import { JourneyLayer } from "./JourneyLayer";
 import { RoutesLayer } from "./RoutesLayer";
 import { SelectedRouteLayer, SelectedStopMarker } from "./SelectionLayers";
 import { StopsLayer } from "./StopsLayer";
@@ -31,6 +32,11 @@ interface Props {
   flyTarget: FlyTarget | null;
   onSelectStop: (stopId: string) => void;
   onSelectRoute: (routeId: string) => void;
+  /** Route planner: A, B and the journey to draw (null when the planner is closed). */
+  planner: { from: PlannerPlace | null; to: PlannerPlace | null; journey: Journey | null } | null;
+  /** True while the user is choosing A or B by clicking on the map. */
+  picking: boolean;
+  onMapClick: (lat: number, lon: number) => void;
 }
 
 export function MapView(props: Props) {
@@ -49,7 +55,7 @@ export function MapView(props: Props) {
       zoomControl={false}
       preferCanvas
       renderer={renderer}
-      className="map"
+      className={`map ${props.picking ? "map-picking" : ""}`}
     >
       {baseMap && (
         <TileLayer
@@ -62,10 +68,21 @@ export function MapView(props: Props) {
       )}
       <ZoomControl position="bottomright" />
       <ScaleControl position="bottomleft" imperial={false} />
-      <MapEvents onViewportChange={props.onViewportChange} flyTarget={props.flyTarget} />
+      <MapEvents
+        onViewportChange={props.onViewportChange}
+        flyTarget={props.flyTarget}
+        onMapClick={props.onMapClick}
+      />
 
       {/* Routes live in the default overlay pane; panes below stack above it. */}
       <RoutesLayer modes={layers.routeModes} onSelect={props.onSelectRoute} />
+
+      {/* Below the stops, so stops stay clickable on top of the journey line. */}
+      <Pane name="journey" style={{ zIndex: 445 }}>
+        {props.planner && (
+          <JourneyLayer from={props.planner.from} to={props.planner.to} journey={props.planner.journey} />
+        )}
+      </Pane>
 
       <Pane name="stops" style={{ zIndex: 450 }}>
         <StopsLayer
@@ -112,12 +129,15 @@ function toViewport(map: L.Map): Viewport {
 function MapEvents({
   onViewportChange,
   flyTarget,
+  onMapClick,
 }: {
   onViewportChange: (viewport: Viewport) => void;
   flyTarget: FlyTarget | null;
+  onMapClick: (lat: number, lon: number) => void;
 }) {
   const map = useMapEvents({
     moveend: () => onViewportChange(toViewport(map)),
+    click: (e) => onMapClick(e.latlng.lat, e.latlng.lng),
   });
 
   useEffect(() => {

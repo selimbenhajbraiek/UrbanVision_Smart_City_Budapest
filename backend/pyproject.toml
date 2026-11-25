@@ -19,6 +19,8 @@ dependencies = [
     "tzdata==2026.4",                 # IANA time zones (needed on Windows)
     "gtfs-realtime-bindings==3.0.0",  # Phase 10: GTFS-Realtime protobuf parsing
     "protobuf==7.36.2",
+    "pyjwt==2.15.1",                  # login tokens (JWT)
+    "pwdlib[argon2]==0.4.2",          # password hashing (Argon2)
 ]
 
 [project.optional-dependencies]

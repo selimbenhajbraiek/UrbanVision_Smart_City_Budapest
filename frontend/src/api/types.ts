@@ -272,3 +272,97 @@ export interface UrbanFeatureProps {
   osm_url: string;
   details: Record<string, string>;
 }
+
+// ---------- Login and admin dashboard ----------
+
+export type Role = "user" | "admin";
+
+export interface User {
+  id: number;
+  email: string;
+  role: Role;
+  is_active: boolean;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+export interface TokenResponse {
+  access_token: string;
+  token_type: "bearer";
+  expires_in: number;
+  user: User;
+}
+
+export interface AdminStats {
+  users: {
+    total: number;
+    admins: number;
+    active: number;
+    new_last_7_days: number;
+    logins_last_7_days: number;
+  };
+  stops: number;
+  routes: number;
+  trips_today: number;
+  urban_features: number;
+}
+
+export interface AdminDataStatus {
+  feed: FeedInfo | null;
+  days_until_expiry: number | null;
+  layers: { id: string; title: string; feature_count: number; imported_at: string | null }[];
+  realtime_enabled: boolean;
+}
+
+// ---------- Route planner (GET /api/plan) ----------
+
+export interface PlanPlace {
+  name: string;
+  latitude: number;
+  longitude: number;
+  stop_id?: string | null;
+}
+
+export interface PlanLeg {
+  kind: "walk" | "transit";
+  start: PlanPlace;
+  end: PlanPlace;
+  departure: string;
+  arrival: string;
+  duration_minutes: number;
+  distance_m: number | null;
+  route: {
+    route_id: string;
+    short_name: string | null;
+    mode: Mode;
+    color: string | null;
+    text_color: string | null;
+  } | null;
+  headsign: string | null;
+  trip_id: string | null;
+  stop_count: number | null;
+  intermediate_stops: PlanPlace[];
+  wheelchair_accessible: boolean | null;
+  /** [longitude, latitude] points */
+  geometry: [number, number][];
+}
+
+export interface Journey {
+  departure: string;
+  arrival: string;
+  duration_minutes: number;
+  transfers: number;
+  walking_minutes: number;
+  walking_m: number;
+  legs: PlanLeg[];
+}
+
+export interface PlanResponse {
+  origin: PlanPlace;
+  destination: PlanPlace;
+  requested_at: string;
+  data_status: DataStatus;
+  schedule_available: boolean;
+  notice: string | null;
+  journeys: Journey[];
+}

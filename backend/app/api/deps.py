@@ -1,17 +1,57 @@
 """Shared request helpers: settings access and validation of common query parameters."""
 
 from datetime import datetime
+from typing import Annotated
 from zoneinfo import ZoneInfo
 
-from fastapi import HTTPException, Request
+from fastapi import Depends, HTTPException, Request
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from psycopg import Connection
 
 from app.config import BUDAPEST_BOUNDS, BUDAPEST_CENTER, Settings
+from app.db import get_connection
 from app.repositories import BBox
+from app.repositories import users as users_repo
+from app.security import InvalidTokenError, decode_token
 from app.transport_modes import parse_modes
+
+_bearer = HTTPBearer(auto_error=False)
 
 
 def get_settings(request: Request) -> Settings:
     return request.app.state.settings
+
+
+def get_current_user(
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+    conn: Annotated[Connection, Depends(get_connection)],
+) -> dict:
+    """The logged-in user (from `Authorization: Bearer <token>`), or 401."""
+    unauthorized = HTTPException(
+        401, "Not authenticated or session expired", headers={"WWW-Authenticate": "Bearer"}
+    )
+    if credentials is None:
+        raise unauthorized
+    try:
+        user_id = decode_token(request.app.state.settings, credentials.credentials)
+    except InvalidTokenError:
+        raise unauthorized from None
+    user = users_repo.get_by_id(conn, user_id)
+    if user is None or not user["is_active"]:
+        raise unauthorized
+    return user
+
+
+def require_admin(user: Annotated[dict, Depends(get_current_user)]) -> dict:
+    """The logged-in user if they are an admin, otherwise 403."""
+    if user["role"] != "admin":
+        raise HTTPException(403, "Admin access required")
+    return user
+
+
+CurrentUser = Annotated[dict, Depends(get_current_user)]
+AdminUser = Annotated[dict, Depends(require_admin)]
 
 
 def local_timezone(settings: Settings) -> ZoneInfo:
