@@ -16,3 +16,12 @@ export interface Viewport {
   bbox: [number, number, number, number];
   zoom: number;
 }
+
+/** Start (A) or destination (B) of the route planner. */
+export interface PlannerPlace {
+  name: string;
+  lat: number;
+  lon: number;
+}
+
+export type PlannerField = "from" | "to";

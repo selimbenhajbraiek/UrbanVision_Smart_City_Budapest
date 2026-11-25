@@ -1,4 +1,5 @@
 import type { DeparturesResponse, StopDetail } from "../../api/types";
+import type { PlannerPlace } from "../../state";
 import { primaryMode } from "../../config/transportModes";
 import type { ApiState } from "../../hooks/useApi";
 import { useApi } from "../../hooks/useApi";
@@ -13,11 +14,13 @@ interface Props {
   onClose: () => void;
   onSelectStop: (stopId: string) => void;
   onSelectRoute: (routeId: string) => void;
+  onPlanFrom: (place: PlannerPlace) => void;
+  onPlanTo: (place: PlannerPlace) => void;
 }
 
 const DEPARTURES_REFRESH_MS = 60_000;
 
-export function StopPanel({ stopId, stop, onClose, onSelectStop, onSelectRoute }: Props) {
+export function StopPanel({ stopId, stop, onClose, onSelectStop, onSelectRoute, onPlanFrom, onPlanTo }: Props) {
   const detail = stop.data?.stop_id === stopId ? stop.data : null;
 
   if (!detail) {
@@ -49,6 +52,23 @@ export function StopPanel({ stopId, stop, onClose, onSelectStop, onSelectRoute }
         </>
       }
     >
+      <div className="plan-buttons">
+        <button
+          type="button"
+          className="small-button"
+          onClick={() => onPlanFrom({ name: detail.name, lat: detail.latitude, lon: detail.longitude })}
+        >
+          <Icon name="route" size={14} /> From here
+        </button>
+        <button
+          type="button"
+          className="small-button"
+          onClick={() => onPlanTo({ name: detail.name, lat: detail.latitude, lon: detail.longitude })}
+        >
+          <Icon name="pin" size={14} /> To here
+        </button>
+      </div>
+
       <section className="panel-section">
         <h3>Lines serving this stop</h3>
         {detail.routes.length === 0 ? (

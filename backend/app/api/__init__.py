@@ -1,7 +1,19 @@
 from fastapi import APIRouter
 
-from . import health, layers, meta, realtime, routes, search, stops, weather
+from . import admin, auth, health, layers, meta, planner, realtime, routes, search, stops, weather
 
 api_router = APIRouter(prefix="/api")
-for module in (health, meta, stops, routes, search, weather, layers, realtime):
+for module in (
+    health,
+    meta,
+    stops,
+    routes,
+    search,
+    planner,
+    weather,
+    layers,
+    realtime,
+    auth,
+    admin,
+):
     api_router.include_router(module.router)

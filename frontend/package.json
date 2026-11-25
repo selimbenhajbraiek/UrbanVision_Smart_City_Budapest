@@ -15,7 +15,8 @@
     "leaflet": "^1.9.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-leaflet": "^5.0.0"
+    "react-leaflet": "^5.0.0",
+    "react-router-dom": "^7.18.7"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^7.0.1",

@@ -68,3 +68,15 @@ export function formatAge(iso: string, now: number = Date.now()): string {
   if (seconds < 60) return `${seconds} s ago`;
   return `${Math.floor(seconds / 60)} min ago`;
 }
+
+/** "25 Nov 2026, 14:05" in Budapest time, for full timestamps (e.g. last login). */
+export function formatDateTime(iso: string): string {
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: TIMEZONE,
+  }).format(new Date(iso));
+}

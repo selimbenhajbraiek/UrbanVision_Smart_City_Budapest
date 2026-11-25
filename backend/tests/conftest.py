@@ -11,6 +11,7 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 from psycopg.rows import dict_row
+from pydantic import SecretStr
 
 from app.config import Settings, get_settings
 from app.main import create_app
@@ -23,7 +24,13 @@ MINI_GTFS = FIXTURES / "mini_gtfs"
 @pytest.fixture(scope="session")
 def settings() -> Settings:
     base = get_settings()
-    return base.model_copy(update={"postgres_db": base.postgres_test_db, "bkk_api_key": None})
+    return base.model_copy(
+        update={
+            "postgres_db": base.postgres_test_db,
+            "bkk_api_key": None,
+            "jwt_secret_key": SecretStr("test-secret-key-that-is-long-enough-for-hs256-signing"),
+        }
+    )
 
 
 @pytest.fixture(scope="session")

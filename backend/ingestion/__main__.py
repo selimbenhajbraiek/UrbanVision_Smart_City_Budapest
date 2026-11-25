@@ -6,9 +6,11 @@ Examples:
     python -m ingestion gtfs --file feed.zip      # import a local ZIP (or extracted folder)
     python -m ingestion osm                       # import all OpenStreetMap layers
     python -m ingestion osm --layer ev_charging
+    python -m ingestion create-admin --email admin@example.com   # asks for a password
 """
 
 import argparse
+import getpass
 import logging
 import sys
 from pathlib import Path
@@ -54,6 +56,14 @@ def main(argv: list[str] | None = None) -> int:
         help="layer to import (repeatable; default: all)",
     )
 
+    admin = commands.add_parser(
+        "create-admin", help="create an admin account (or promote / reset an existing one)"
+    )
+    admin.add_argument("--email", required=True)
+    admin.add_argument(
+        "--password", help="omit to be asked securely (recommended: it then stays out of history)"
+    )
+
     args = parser.parse_args(argv)
     settings = get_settings()
     setup_logging(settings.log_level)
@@ -86,6 +96,8 @@ def main(argv: list[str] | None = None) -> int:
             )
             for layer_id, count in counts.items():
                 print(f"  {layer_id:<16}{count:>6} features")
+        elif args.command == "create-admin":
+            return create_admin(database_url, args.email, args.password)
     except (GtfsSourceError, GtfsValidationError, OverpassError) as exc:
         logger.error("%s", exc)
         return 1
@@ -94,6 +106,34 @@ def main(argv: list[str] | None = None) -> int:
             "Cannot connect to the database. Is `docker compose up -d db` running?\n%s", exc
         )
         return 1
+    return 0
+
+
+def create_admin(database_url: str, email: str, password: str | None) -> int:
+    from psycopg.rows import dict_row
+
+    from app.repositories import users as users_repo
+    from app.security import hash_password
+
+    email = email.strip().lower()
+    if password is None:
+        password = getpass.getpass("Password (min. 8 characters): ")
+        if password != getpass.getpass("Repeat password: "):
+            logger.error("Passwords do not match")
+            return 1
+    if len(password) < 8:
+        logger.error("Password must be at least 8 characters")
+        return 1
+    with psycopg.connect(database_url, autocommit=True, row_factory=dict_row) as conn:
+        apply_schema(conn)
+        existing = users_repo.get_by_email_with_hash(conn, email)
+        if existing:
+            users_repo.update(conn, existing["id"], role="admin", is_active=True)
+            users_repo.set_password(conn, existing["id"], hash_password(password))
+            print(f"Existing user {email} is now an admin (password updated).")
+        else:
+            users_repo.create(conn, email, hash_password(password), role="admin")
+            print(f"Admin account {email} created.")
     return 0
 
 

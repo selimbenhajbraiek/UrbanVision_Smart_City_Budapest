@@ -147,6 +147,19 @@ CREATE TABLE IF NOT EXISTS urban_layer_imports (
 );
 
 -- ---------------------------------------------------------------------------
+-- User accounts (login + admin dashboard). Not touched by the GTFS/OSM importers.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS users (
+    id            SERIAL PRIMARY KEY,
+    email         TEXT NOT NULL UNIQUE,      -- stored lower-case
+    password_hash TEXT NOT NULL,             -- Argon2 hash, never the plain password
+    role          TEXT NOT NULL DEFAULT 'user' CHECK (role IN ('user', 'admin')),
+    is_active     BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    last_login_at TIMESTAMPTZ
+);
+
+-- ---------------------------------------------------------------------------
 -- Indexes
 -- ---------------------------------------------------------------------------
 CREATE INDEX IF NOT EXISTS stops_geom_idx            ON stops USING GIST (geom);
