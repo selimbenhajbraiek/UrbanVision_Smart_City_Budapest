@@ -12,6 +12,10 @@ quality, and smart-city infrastructure such as EV chargers, bike sharing and Par
 **Live** (real-time). Live transport data is only shown if a BKK API key is configured
 (see [Future improvements](#16-future-improvements)). UrbanVision never simulates live data.
 
+> **Already running an older copy of the project?** The user accounts, admin dashboard and route
+> planner need three extra setup steps. See
+> [Updating an existing installation](#updating-an-existing-installation).
+
 ---
 
 ## Contents
@@ -58,6 +62,9 @@ can be plugged in later without changing the rest of the application.
 | Stop details | Name, ID, accessibility, lines serving the stop, **next scheduled departures** (refreshed every minute), and other platforms of the same interchange |
 | Line details | Operator, trips today, both directions with their ordered stops. The line is highlighted and the map zooms to it. |
 | Search | Accent-insensitive search for stops and lines (`deak`, `M2`, `47`) |
+| Route planner | **Plan trip** from A to B: choose places by searching a stop, clicking the map, or "From here" / "To here" on a stop. Shows up to three public-transport journeys (plus a walking option for short trips) with times, changes and walking, explains the chosen one step by step, and draws it on the map. Based on the scheduled timetable. |
+| User accounts | Register, log in and log out. Passwords are hashed (Argon2) and sessions use signed tokens (JWT). The map itself stays public. |
+| Admin dashboard | `/admin`, for administrators only: user and data figures, user management (promote, deactivate, delete), and the status of the imported data (timetable validity, OpenStreetMap layers, real-time). |
 | Weather | Temperature, condition, feels-like temperature, wind, precipitation, humidity and a 6-hour forecast |
 | Air quality | European AQI, PM2.5, PM10, NO₂ and O₃ (CAMS model data) |
 | Urban data | EV charging stations (517), bike sharing and rental (228), Park & Ride (53), from OpenStreetMap |
@@ -120,21 +127,25 @@ UrbanVision_Smart_City_Budapest/
 │   ├── app/                    # FastAPI application
 │   │   ├── main.py             # app factory, middleware, error handlers
 │   │   ├── config.py           # settings from environment / .env
-│   │   ├── api/                # HTTP routers (one file per resource)
+│   │   ├── security.py         # password hashing (Argon2) and login tokens (JWT)
+│   │   ├── api/                # HTTP routers (one file per resource, incl. auth, admin, planner)
 │   │   ├── repositories/       # all SQL queries
-│   │   ├── services/           # weather client, departure-time logic, cache
+│   │   ├── services/           # weather client, departure-time logic, cache, route planner
 │   │   ├── schemas/            # Pydantic response models
 │   │   └── realtime/           # real-time provider interface + BKK GTFS-RT client
-│   ├── ingestion/              # CLI: GTFS and OpenStreetMap importers
+│   ├── ingestion/              # CLI: GTFS and OpenStreetMap importers, create-admin
 │   └── tests/                  # pytest suite + mini GTFS fixture feed
 └── frontend/
     ├── package.json
     ├── vite.config.ts          # dev proxy /api → backend
     └── src/
-        ├── api/                # fetch client + TypeScript API types
+        ├── main.tsx            # page routes: / (map), /login, /register, /admin
+        ├── api/                # fetch client (sends the login token) + TypeScript API types
+        ├── auth/               # login state (AuthContext) and the admin-only guard
+        ├── pages/              # login, register and admin dashboard pages
         ├── config/             # transport modes, map, layer state
         ├── hooks/useApi.ts     # data fetching hook
-        ├── components/         # map layers, panels, dashboard, header
+        ├── components/         # map layers, panels, dashboard, header, admin, planner
         └── styles/global.css
 ```
 
@@ -149,6 +160,8 @@ UrbanVision_Smart_City_Budapest/
 | Database | PostgreSQL 17 + PostGIS 3.5 (Docker) | Spatial indexes, geometry functions, GeoJSON output |
 | Data processing | pandas | Reading, cleaning and validating GTFS CSV files |
 | HTTP client | httpx | Open-Meteo, Overpass, BKK real-time |
+| Accounts | pwdlib (Argon2), PyJWT, react-router | Safe password storage, stateless login tokens, separate login/admin pages |
+| Route planner | Connection Scan Algorithm (own implementation) | Runs on the imported GTFS timetable, no external routing service or API key |
 | Tests | pytest, respx (HTTP mocking), Vitest, Testing Library | |
 | Lint and format | ruff, `tsc --noEmit` | |
 
@@ -160,9 +173,11 @@ UrbanVision_Smart_City_Budapest/
 git clone <your-repo-url> UrbanVision_Smart_City_Budapest
 cd UrbanVision_Smart_City_Budapest
 
-# 1. Configuration: copy the template and set a password
+# 1. Configuration: copy the template, then edit .env
 cp .env.example .env            # Windows PowerShell: Copy-Item .env.example .env
-#    then edit .env and change POSTGRES_PASSWORD
+#    - change POSTGRES_PASSWORD
+#    - set JWT_SECRET_KEY to a long random value (needed for log in), e.g. the output of:
+#      python -c "import secrets; print(secrets.token_urlsafe(48))"
 
 # 2. Database
 docker compose up -d db
@@ -173,10 +188,47 @@ python -m venv .venv
 .venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
 pip install -e ".[dev]"
 
-# 4. Frontend
+# 4. Data and first admin account (see sections 7 and 8)
+python -m ingestion init-db
+python -m ingestion gtfs
+python -m ingestion osm
+python -m ingestion create-admin --email admin@example.com   # asks for a password
+
+# 5. Frontend
 cd ../frontend
 npm install
 ```
+
+### Updating an existing installation
+
+If you already had UrbanVision running before the **user accounts, admin dashboard and route
+planner** were added, do this once after pulling the new code (`git pull`):
+
+```bash
+# 1. Add a login secret to the project-root .env (keep it private, never commit it)
+python -c "import secrets; print(secrets.token_urlsafe(48))"
+#    copy the output into .env:   JWT_SECRET_KEY=<the value>
+#    optional:                    JWT_EXPIRE_MINUTES=60
+
+# 2. Install the new dependencies
+cd backend
+.venv\Scripts\activate          # macOS/Linux: source .venv/bin/activate
+pip install -e ".[dev]"         # adds pyjwt and pwdlib[argon2]
+cd ../frontend
+npm install                     # adds react-router-dom
+
+# 3. Create the new `users` table (existing data is kept) and your admin account
+cd ../backend
+python -m ingestion init-db
+python -m ingestion create-admin --email admin@example.com
+```
+
+Then restart the backend (`uvicorn ...`) so it reads the new `.env` value.
+
+- **Without `JWT_SECRET_KEY`** the map and the route planner still work, but log in and register
+  answer *503 "Login is not configured"*.
+- **Without `init-db`** the login and admin endpoints answer *503 "Database is not initialised"*.
+- The route planner needs no extra step: it uses the timetable that is already imported.
 
 ## 6. Environment variables
 
@@ -199,6 +251,8 @@ read it, and `.env` is git-ignored. **Never commit secrets.**
 | `WEATHER_CACHE_TTL_SECONDS` | `600` | How long weather responses are cached |
 | `OVERPASS_URL` | `https://overpass-api.de/api/interpreter` | OpenStreetMap query API |
 | `BKK_API_KEY` | *(empty)* | Optional: enables live vehicles and alerts (free key from opendata.bkk.hu) |
+| `JWT_SECRET_KEY` | *(required for log in)* | Secret that signs login tokens. Use a long random value; changing it logs everyone out. |
+| `JWT_EXPIRE_MINUTES` | `60` | How long a login stays valid |
 
 Frontend (optional, `frontend/.env.local`): `VITE_API_BASE_URL` for production builds served
 from another host, and `VITE_PROXY_TARGET` if the backend is not on `127.0.0.1:8000`.
@@ -215,7 +269,9 @@ The schema lives in [backend/db/schema.sql](backend/db/schema.sql) and is idempo
 re-run). Tables, relationships and indexes are explained in
 [docs/database.md](docs/database.md). The main GTFS tables are `agencies`, `routes`, `stops`,
 `trips`, `stop_times`, `calendar`, `calendar_dates` and `shapes`. The derived tables are
-`service_dates` and `route_stops`, and `urban_pois` holds the OpenStreetMap layers.
+`service_dates` and `route_stops`, and `urban_pois` holds the OpenStreetMap layers. `users`
+holds the accounts (e-mail, Argon2 password hash, role `user` or `admin`, active flag); the
+GTFS and OpenStreetMap importers never touch it.
 
 To inspect the database:
 `docker exec -it urbanvision-db psql -U urbanvision -d urbanvision`
@@ -266,6 +322,18 @@ Imported GTFS in 196.4s
 > The BKK feed covers only about 5 weeks ahead. **Re-import before a demo.** The UI warns you
 > when today is outside the imported timetable.
 
+### Admin account
+
+There is no public way to become an admin. Create the first one from the command line:
+
+```bash
+cd backend
+python -m ingestion create-admin --email admin@example.com   # asks for the password twice (min. 8 characters)
+```
+
+Running it again with an existing e-mail promotes that user to admin and resets the password.
+After that, admins can promote other users from the dashboard at <http://localhost:5173/admin>.
+
 ## 9. Running the backend
 
 ```bash
@@ -287,10 +355,13 @@ npm run build        # production build in frontend/dist (type-checks first)
 
 ## 11. API documentation
 
-All endpoints are `GET` and live under `/api`. Map layers return **GeoJSON**
+All endpoints live under `/api`. Data endpoints are `GET`; only the account and admin
+endpoints use `POST`, `PATCH` and `DELETE`. Map layers return **GeoJSON**
 (`application/geo+json`) and everything else returns JSON. Errors always have the form
-`{"detail": "…"}`: **404** for an unknown stop, route or layer, **422** for invalid parameters,
-and **503** when the database or an upstream service is unavailable.
+`{"detail": "…"}`: **401** when a login is required, **403** when admin rights are required,
+**404** for an unknown stop, route, layer or user, **409** for a conflict (e-mail already
+registered, removing the last admin), **422** for invalid parameters, and **503** when the
+database or an upstream service is unavailable.
 
 | Endpoint | Description |
 | --- | --- |
@@ -311,6 +382,24 @@ and **503** when the database or an upstream service is unavailable.
 | `GET /api/realtime/status` | Whether live data is configured |
 | `GET /api/realtime/vehicles?mode=` | Live vehicle positions (503 unless `BKK_API_KEY` is set) |
 | `GET /api/realtime/alerts` | Live service alerts (503 unless `BKK_API_KEY` is set) |
+| `GET /api/plan?from=lat,lon&to=lat,lon&date=&time=` | **Route planner:** up to three journeys from A to B, plus a walking option (scheduled timetable) |
+| `POST /api/auth/register` | Create an account (`{"email", "password"}`, password ≥ 8 characters) and log in |
+| `POST /api/auth/login` | Log in; returns a bearer token |
+| `GET /api/auth/me` | The logged-in user (needs `Authorization: Bearer <token>`) |
+| `GET /api/admin/stats` | *Admin:* user and data figures |
+| `GET /api/admin/users` | *Admin:* list of users |
+| `PATCH /api/admin/users/{id}` | *Admin:* change role (`user`/`admin`) or activate/deactivate |
+| `DELETE /api/admin/users/{id}` | *Admin:* delete a user |
+| `GET /api/admin/data-status` | *Admin:* timetable validity, OpenStreetMap layer imports, real-time status |
+
+In Swagger (`/docs`), log in with `POST /api/auth/login`, copy the `access_token`, and paste it
+into the **Authorize** button to try the admin endpoints.
+
+**Route planner algorithm.** `GET /api/plan` runs the Connection Scan Algorithm on the next
+2.5 hours of the imported timetable: walk up to 800 m to and from stops, change between stops up
+to 250 m apart, 60 s minimum change time. It returns the earliest arrival first and the next
+departures as alternatives (about 0.4 s for Budapest). Details:
+[backend/app/services/planner.py](backend/app/services/planner.py).
 
 Full parameter descriptions and example responses: [docs/api.md](docs/api.md). The live
 Swagger UI at `/docs` lets you try every endpoint.
@@ -321,8 +410,8 @@ Swagger UI at `/docs` lets you try every endpoint.
 
 ```bash
 docker compose up -d db              # database tests need PostgreSQL running
-cd backend && pytest                 # 96 tests
-cd frontend && npm test              # 21 tests
+cd backend && pytest                 # 136 tests
+cd frontend && npm test              # 41 tests
 cd frontend && npm run typecheck
 cd backend && ruff check . && ruff format --check .
 ```
@@ -343,11 +432,16 @@ coordinates, an invalid route type, orphan rows and an invalid time. The tests c
 | Service-day time maths, including daylight-saving days | `test_schedule_time.py` |
 | OpenStreetMap layers (parsing, retries, storage, API) | `test_urban_layers.py` |
 | Real-time provider (synthetic GTFS-RT protobuf) | `test_realtime.py` |
+| Register, log in, tokens (expired, forged), deactivated users | `test_auth.py` |
+| Admin access rules (401/403), user management, data status, `create-admin` | `test_admin.py` |
+| Route planner: direct and walking-transfer trips, after-midnight trips, no service, invalid requests, the scan algorithm itself | `test_planner.py` |
 
 No test calls the internet: every external API is mocked with `respx`.
 
 **Frontend (Vitest).** The tests cover layer and URL state, transport-mode rules, formatting
-(including Budapest time zone handling) and component rendering (dashboard, weather card, badges).
+(including Budapest time zone handling), component rendering (dashboard, weather card, badges),
+log in and the admin-only page guard, the admin users table and data status, and the route
+planner (journey list, step-by-step view, panel).
 
 ### Manual test checklist
 
@@ -374,6 +468,14 @@ Start the database, backend and frontend, then open <http://localhost:5173>:
     `/api/stops/NOPE` returns 404 and `/api/stops?bbox=1,2` returns 422.
 13. Narrow the browser window (under 900 px). The panel becomes a bottom sheet and the
     header buttons collapse to icons.
+14. Click **Plan trip**. Choose A by typing `deak` and B with the pin button and a click on the
+    map. Up to three journeys appear (marked **Scheduled**); the chosen one is explained step by
+    step and drawn on the map between the A and B pins.
+15. Open a stop and click **From here**: the planner opens with that stop as A.
+16. Click **Log in** → **Create one**, register a user, then open `/admin`: you see
+    "Access denied".
+17. Log in with the admin account from `create-admin`. **Admin** appears in the header; the
+    dashboard shows the figures, the users (promote, deactivate, delete) and the data status.
 
 ## 13. Data sources
 
@@ -425,8 +527,19 @@ occupancy, sensor-based air quality), are documented in
   scheduled in the skipped or repeated hour may appear shifted by one hour.
 - The real-time client is tested against the GTFS-Realtime specification with synthetic data.
   It has **not** been tested against the live BKK endpoint without an API key.
+- **Route planner:** it uses the scheduled timetable (no delays), estimates walking as a straight
+  line × 1.25 rather than along real streets, optimises the earliest arrival (not the fewest
+  changes), only searches the next 2.5 hours, and draws vehicle legs stop to stop rather than
+  along the exact line shape.
+- **Accounts:** there is no password reset by e-mail (an admin can rerun `create-admin`), and
+  logging out only forgets the token in the browser; the token stays valid until it expires
+  (60 min by default). Deactivated or deleted users lose access immediately.
 
 ## 16. Future improvements
+
+- **Route planner:** live delays (with `BKK_API_KEY`), a multi-criteria search (time *and*
+  changes, e.g. RAPTOR), walking along real streets, an accessible-only option and
+  "arrive by" times.
 
 - **Real-time (Phase 10 design is ready).** Register at <https://opendata.bkk.hu/> and set
   `BKK_API_KEY` to enable live vehicle positions and alerts. Next steps:
